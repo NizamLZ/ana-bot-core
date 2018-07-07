@@ -35,13 +35,19 @@ class AnaNode():
         next_node_data = self.__get_next_node_data(input_data=input_data, node_content=current_node_contents, state=state)
 
         next_node_id = next_node_data.get("node_id", "")
-        node_key = state.get("flow_id", "")+ "." + next_node_id if next_node_id != "" else self.node_key
+        node_key = state.get("flow_id", "") + "." + next_node_id if next_node_id != "" else self.node_key
 
         events = next_node_data["event_data"]
         user_input = next_node_data["user_input"]
 
         return {"node_id": node_key, "input_data": user_input, "publish_events": events}
 
+    def check_if_agent_node(self):
+        node = self.get_contents()
+        node_type = node.get("NodeType")
+        if node_type == "HandoffToAgent":
+            return True
+        return False
 
     @classmethod
     def __get_next_node_data(cls, input_data, node_content, state):
@@ -52,7 +58,7 @@ class AnaNode():
         user_input = {}
         var_name = node_content.get("VariableName", "")
 
-        button_contents = cls._extract_button_elements(node_content)
+        button_contents = cls._extract_button_elements(node_content, state)
 
         click_buttons = cls._get_button_elements(buttons=button_contents, type_of_button="click")
         input_buttons = cls._get_button_elements(buttons=button_contents, type_of_button="input")
@@ -62,8 +68,8 @@ class AnaNode():
         if input_key == "val":
 
             for button in click_buttons:
-                current_node_id = input_data["val"]
-                if button["_id"] == current_node_id:
+                input_button_id = input_data["val"]
+                if button["_id"] == input_button_id:
                     if var_name:
                         var_val = button.get("VariableValue", "")
                         user_input[var_name] = AnaHelper.verb_replacer(text=var_val, state=state)
@@ -103,6 +109,11 @@ class AnaNode():
                 if button_type in valid_button_types:
                     if button_type == "GetNumber":
                         input_value = int(input_data[input_key])
+                    elif button_type in ["GetDate", "GetTime", "GetLocation"]:
+                        if isinstance(input_data[input_key], str):
+                            input_value = json.loads(input_data[input_key])
+                        else:
+                            input_value = input_data[input_key]
                     else:
                         input_value = str(input_data[input_key])
 
@@ -119,19 +130,22 @@ class AnaNode():
         return {"node_id": next_node_id, "event_data": event_data, "user_input": user_input}
 
     @classmethod
-    def _extract_button_elements(cls, data):
+    def _extract_button_elements(cls, data, state):
 
         node_buttons = data.get("Buttons", [])
+        node_buttons = AnaHelper.process_repeatable(node_buttons, state)
         sections = data.get("Sections", [])
-        section_buttons = []
+        all_section_buttons = []
 
         for section in sections:
             if section["SectionType"] == "Carousel":
-                section_items = section["Items"]
-                for item in section_items:
-                    button_element = item.get("Buttons", [])
-                    section_buttons = section_buttons + button_element
-        return node_buttons + section_buttons
+                carousel_items = section["Items"]
+                carousel_items = AnaHelper.process_repeatable(carousel_items, state, True)
+                for car_item in carousel_items:
+                    carousel_buttons = car_item.get("Buttons", [])
+                    carousel_buttons = AnaHelper.process_repeatable(carousel_buttons, state)
+                    all_section_buttons = all_section_buttons + carousel_buttons
+        return node_buttons + all_section_buttons
 
     @classmethod
     def _get_button_elements(cls, buttons, type_of_button):

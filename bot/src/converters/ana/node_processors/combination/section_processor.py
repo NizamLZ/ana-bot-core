@@ -64,8 +64,10 @@ class SectionProcessor():
             media_type = MediaType.get_value("VIDEO")
 
         url = data.get("Url", "")
+        url = AnaHelper.verb_replacer(text=url, state=self.state)
         url = furl(url).url
         preview_url = data.get("PreviewUrl", "")
+        preview_url = AnaHelper.verb_replacer(text=preview_url, state=self.state)
         preview_url = furl(preview_url).url
         text = data.get("Title", "")
         text = AnaHelper.verb_replacer(text=text, state=self.state)
@@ -81,7 +83,7 @@ class SectionProcessor():
 
         message_type = MessageType.get_value("CAROUSEL")
         section_items = data.get("Items", [])
-
+        section_items = AnaHelper.process_repeatable(section_items, self.state, True)
         item_elements = []
         item_elements = [self.__process_carousel_item(item) for item in section_items]
 
@@ -95,6 +97,7 @@ class SectionProcessor():
 
         media_type = MediaType.get_value("IMAGE")
         image_url = section_item.get("ImageUrl", "")
+        image_url = AnaHelper.verb_replacer(text=image_url, state=self.state)
         image_url = furl(image_url).url
 
         title = section_item.get("Title", "")
@@ -104,7 +107,7 @@ class SectionProcessor():
 
         media_content = Media(type=media_type, url=image_url).trim()
         buttons = section_item.get("Buttons", [])
-
+        buttons = AnaHelper.process_repeatable(buttons, self.state)
         options = []
         options = [self.__process_carousel_button(button) for button in buttons]
 
@@ -116,14 +119,20 @@ class SectionProcessor():
     def __process_carousel_button(self, button):
 
         if button["Type"] == "OpenUrl":
-            button_title = button.get("Text", "")
-            button_value = json.dumps({"url": button["Url"], "value": button["_id"]})
+            url = button.get("Url", "")
+            url = AnaHelper.verb_replacer(text=url, state=self.state)
+            button_value = json.dumps({"url": url, "value": button["_id"]})
             button_type = ButtonType.get_value("URL")
+        elif button["Type"] == "DeepLink":
+            url = button.get("Url", "")
+            url = AnaHelper.verb_replacer(text=url, state=self.state)
+            button_value = json.dumps({"url": url, "value": button["_id"]})
+            button_type = ButtonType.get_value("DEEPLINK")
         else:
-            button_title = button.get("Text", "")
             button_value = button["_id"]
             button_type = ButtonType.get_value("ACTION")
 
+        button_title = button.get("Text", "")
         button_title = AnaHelper.verb_replacer(text=button_title, state=self.state)
         option_element = Option(title=button_title, value=button_value, type=button_type).trim()
 

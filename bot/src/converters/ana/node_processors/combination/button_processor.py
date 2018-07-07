@@ -21,11 +21,13 @@ class ButtonProcessor():
 
     def process(self, buttons):
 
+        logger.info(f"btns before: {len(buttons)}")
+        buttons = AnaHelper.process_repeatable(buttons, self.state)
+        logger.info(f"btns after: {len(buttons)}")
         click_elements = [button for button in buttons if button["ButtonType"] in self.click_inputs]
         text_elements = [button for button in buttons if button["ButtonType"] in self.text_inputs]
 
         messages_data = []
-
 
         if click_elements != [] and text_elements == []:
             messages_data = self.__process_click_inputs(click_elements, mandatory=1)
@@ -36,7 +38,6 @@ class ButtonProcessor():
 
         return messages_data
 
-    # @classmethod
     def __process_click_inputs(self, data, mandatory):
 
         button_heading = None
@@ -60,7 +61,6 @@ class ButtonProcessor():
 
         return elem_message_data
 
-    # @classmethod
     def __process_text_inputs(self, data):
 
         elem_message_data = []
@@ -69,7 +69,6 @@ class ButtonProcessor():
 
         return elem_message_data
 
-    # @classmethod
     def __process_click_button(self, button):
         button_type = button.get("ButtonType", "")
 
@@ -81,6 +80,11 @@ class ButtonProcessor():
             url = AnaHelper.verb_replacer(text=url, state=self.state)
             value = json.dumps({"url": url, "value": button["_id"]})
             type_of_button = ButtonType.get_value("URL")
+        elif button_type == "DeepLink":
+            url = button.get("DeepLinkUrl", "")
+            url = AnaHelper.verb_replacer(text=url, state=self.state)
+            value = json.dumps({"url": url, "value": button["_id"]})
+            type_of_button = ButtonType.get_value("DEEPLINK")
         elif button_type == "NextNode":
             value = button["_id"]
             type_of_button = ButtonType.get_value("QUICK_REPLY")
@@ -88,7 +92,6 @@ class ButtonProcessor():
         option = Option(title=title, value=value, type=type_of_button).trim()
         return option
 
-    # @classmethod
     def __process_input_button(self, button):
 
         button_type = button.get("ButtonType")
@@ -128,7 +131,6 @@ class ButtonProcessor():
 
         return message_data
 
-    # @classmethod
     def __process_getitem_button(self, data):
 
         source = data.get("ItemsSource")
